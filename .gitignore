@@ -1,0 +1,18 @@
+.env
+*.xlsx
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local tooling config
+.claude/
+
+# Internal docs / learning notes — keep out of the public repo
+*.docx
+*.pdf
+Product info/
+understanding_claude_code.md
+understanding_scraper_code.md
+make_summary_pdf.py
