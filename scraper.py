@@ -12,7 +12,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 from pydantic import BaseModel, Field
 
-load_dotenv()
+# override=True ensures the .env file is authoritative even if a stray
+# (possibly empty) variable of the same name already exists in the environment.
+# On Streamlit Cloud there is no .env file, so this overrides nothing and the
+# secrets-bridged values survive.
+load_dotenv(override=True)
 API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
@@ -29,7 +33,14 @@ GENERIC_EMAIL_PREFIXES = {
     "help", "team", "mail", "service", "reception", "reservations", "bookings",
     "inquiries", "enquiries", "questions", "customerservice",
 }
-CONTACT_PATHS = ["/", "/contact", "/contact-us"]
+# Homepage first, then common contact-page slugs across languages.
+# /kontakt covers Polish & German; /contacto Spanish; /contatti Italian;
+# /contact-us & /contact English. We only try later paths if the homepage
+# yields no emails (see early-exit in scrape_emails), so extra paths add no
+# cost for sites that already expose an email up front.
+CONTACT_PATHS = [
+    "/", "/contact", "/contact-us", "/kontakt", "/contacto", "/contatti",
+]
 SKIP_DOMAINS_FOR_SCRAPING = (
     "facebook.com", "instagram.com", "yelp.com", "tripadvisor.",
     "google.com", "linkedin.com", "twitter.com", "x.com",
@@ -240,13 +251,24 @@ def search_places(query, max_results):
 
 
 def fetch_details(place_id):
+    # A transient network error on a single lead's details call should not
+    # crash the whole run — return empty so the lead keeps its search data
+    # (name, address, rating) with phone/website falling back to "N/A".
     params = {"place_id": place_id, "fields": DETAILS_FIELDS, "key": API_KEY}
-    response = requests.get(DETAILS_URL, params=params, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-    if data.get("status") != "OK":
-        return {}
-    return data.get("result", {})
+    for attempt in range(3):
+        try:
+            response = requests.get(DETAILS_URL, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            if data.get("status") != "OK":
+                return {}
+            return data.get("result", {})
+        except requests.RequestException:
+            if attempt < 2:
+                time.sleep(1 + attempt)
+                continue
+            return {}
+    return {}
 
 
 def build_row(place):

@@ -15,4 +15,5 @@ venv/
 Product info/
 understanding_claude_code.md
 understanding_scraper_code.md
+client_demo_script.md
 make_summary_pdf.py
