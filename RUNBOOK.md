@@ -52,6 +52,12 @@ A repeatable "new client in N minutes" sequence.
 3. Set a plain env var `LEADS_DB_PATH=/var/data/leads.db` so the database lives
    on the disk (not ephemeral container storage).
 4. Render provides HTTPS automatically.
+5. **Turn auto-deploy OFF** (Settings → Build & Deploy → Auto-Deploy: **No**).
+   Client instances must update only through the staged rollout (§3) with a
+   verified tag — never automatically on every push to `main`. This is the D5
+   "staged, never push-to-all" rule: a bad commit must not reach every client at
+   once. (A staging/canary instance that intentionally tracks `main` may leave
+   auto-deploy on; client instances must not.)
 
 ### 2.2 Build the client's secrets
 Create a `secrets.toml` from [`secrets.toml.example`](secrets.toml.example):
