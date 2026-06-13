@@ -18,33 +18,42 @@ APP_USER="appuser"
 SECRETS_DIR="/app/.streamlit"
 SECRETS_FILE="${SECRETS_DIR}/secrets.toml"
 
-if [[ -z "${SECRETS_TOML_B64:-}" ]]; then
-    echo "FATAL: SECRETS_TOML_B64 is not set. Refusing to start without secrets." >&2
+mkdir -p "${SECRETS_DIR}"
+
+# Acquire the Streamlit secrets file from the first available source:
+#   1. SECRETS_TOML_B64 env var  -> base64 of the secrets file (portable; works
+#      on any host). Whitespace from a copy-paste is stripped before decoding.
+#   2. A host-mounted raw secret file at /etc/secrets/secrets.toml (e.g. Render
+#      "Secret Files") -> plain TOML, no base64, nothing to decode.
+#   3. A secrets file already present at ${SECRETS_FILE}.
+if [[ -n "${SECRETS_TOML_B64:-}" ]]; then
+    ( umask 077
+      if ! printf '%s' "${SECRETS_TOML_B64}" | tr -d '[:space:]' | base64 -d > "${SECRETS_FILE}" 2>/dev/null; then
+          echo "FATAL: SECRETS_TOML_B64 is set but could not be base64-decoded." >&2
+          rm -f "${SECRETS_FILE}"
+          exit 1
+      fi
+    )
+    echo "Secrets source: SECRETS_TOML_B64 env var."
+elif [[ -s /etc/secrets/secrets.toml ]]; then
+    ( umask 077; cp /etc/secrets/secrets.toml "${SECRETS_FILE}" )
+    echo "Secrets source: mounted secret file /etc/secrets/secrets.toml."
+elif [[ -s "${SECRETS_FILE}" ]]; then
+    echo "Secrets source: existing ${SECRETS_FILE}."
+else
+    echo "FATAL: no secrets provided. Set SECRETS_TOML_B64, or mount a secret file at /etc/secrets/secrets.toml." >&2
     exit 1
 fi
 
-mkdir -p "${SECRETS_DIR}"
-
-# Decode straight to the file. Do not print the contents on success or failure.
-# `umask 077` ensures the file is created private even before the explicit chmod.
-# `tr -d '[:space:]'` strips any whitespace (spaces/newlines) that a copy-paste
-# into a host's env-var field may have introduced, so the decode is robust.
-( umask 077
-  if ! printf '%s' "${SECRETS_TOML_B64}" | tr -d '[:space:]' | base64 -d > "${SECRETS_FILE}" 2>/dev/null; then
-      echo "FATAL: SECRETS_TOML_B64 could not be base64-decoded." >&2
-      rm -f "${SECRETS_FILE}"
-      exit 1
-  fi
-)
-
 if [[ ! -s "${SECRETS_FILE}" ]]; then
-    echo "FATAL: decoded secrets file is empty." >&2
+    echo "FATAL: secrets file is empty after setup." >&2
     rm -f "${SECRETS_FILE}"
     exit 1
 fi
 
 chown "${APP_USER}:${APP_USER}" "${SECRETS_FILE}"
 chmod 600 "${SECRETS_FILE}"
+echo "Secrets ready at ${SECRETS_FILE} ($(wc -c < "${SECRETS_FILE}") bytes; contents not logged)."
 
 # Make the database directory writable by the non-root app user. On a fresh
 # persistent disk (e.g. Render) the mount is root-owned, so the app could not
