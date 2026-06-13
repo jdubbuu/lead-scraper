@@ -8,6 +8,9 @@ venv/
 
 # Secrets — never commit. The example files (*.example) are safe to track.
 secrets.toml
+secrets-*.toml
+*.b64.txt
+staging-login.txt
 .streamlit/secrets.toml
 .streamlit/
 

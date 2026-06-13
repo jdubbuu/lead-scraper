@@ -27,8 +27,10 @@ mkdir -p "${SECRETS_DIR}"
 
 # Decode straight to the file. Do not print the contents on success or failure.
 # `umask 077` ensures the file is created private even before the explicit chmod.
+# `tr -d '[:space:]'` strips any whitespace (spaces/newlines) that a copy-paste
+# into a host's env-var field may have introduced, so the decode is robust.
 ( umask 077
-  if ! printf '%s' "${SECRETS_TOML_B64}" | base64 -d > "${SECRETS_FILE}" 2>/dev/null; then
+  if ! printf '%s' "${SECRETS_TOML_B64}" | tr -d '[:space:]' | base64 -d > "${SECRETS_FILE}" 2>/dev/null; then
       echo "FATAL: SECRETS_TOML_B64 could not be base64-decoded." >&2
       rm -f "${SECRETS_FILE}"
       exit 1
