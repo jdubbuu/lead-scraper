@@ -5,16 +5,25 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
-# Bridge Streamlit Cloud secrets into environment variables so scraper.py's
-# os.getenv() calls and the Anthropic SDK can find the API keys when deployed.
-# Locally this is a no-op: there's no .streamlit/secrets.toml, and .env wins.
+# Bridge Streamlit secrets into environment variables so scraper.py's
+# os.getenv() calls, the Anthropic SDK, and config.py can find these values
+# when deployed. Locally this is a no-op: there's no .streamlit/secrets.toml,
+# and .env wins.
 try:
-    for _key in ("GOOGLE_PLACES_API_KEY", "ANTHROPIC_API_KEY"):
+    for _key in (
+        "GOOGLE_PLACES_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "COOKIE_NAME",
+        "COOKIE_KEY",
+        "COOKIE_EXPIRY_DAYS",
+        "CLIENT_NAME",
+    ):
         if _key in st.secrets:
             os.environ.setdefault(_key, str(st.secrets[_key]))
 except Exception:
     pass
 
+from auth import render_logout, require_login
 from database import (
     STATUS_OPTIONS,
     get_all_leads_for_display,
@@ -38,6 +47,11 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide",
 )
+
+# Gate the entire app. require_login() halts the script for anyone who isn't
+# authenticated, so nothing below this line runs for an unauthenticated visitor.
+_authenticator = require_login()
+render_logout(_authenticator)
 
 # Make sure the SQLite file and table exist before anything else runs.
 init_db()

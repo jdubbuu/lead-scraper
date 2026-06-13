@@ -6,6 +6,20 @@ __pycache__/
 .venv/
 venv/
 
+# Secrets — never commit. The example files (*.example) are safe to track.
+secrets.toml
+.streamlit/secrets.toml
+.streamlit/
+
+# Backups (client data) — never commit.
+backups/
+
+# Deployment operator state and per-client instance configs (client-specific).
+# The committed template deploy/instances/example.env is the only exception.
+deploy/state/
+deploy/instances/*.env
+!deploy/instances/example.env
+
 # Local tooling config
 .claude/
 

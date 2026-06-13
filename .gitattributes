@@ -1,0 +1,7 @@
+# Normalize line endings. Shell scripts and the Dockerfile MUST be LF so they
+# run correctly in the Linux container (CRLF in entrypoint.sh would break its
+# shebang). Other text files are auto-normalized.
+* text=auto
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile text eol=lf

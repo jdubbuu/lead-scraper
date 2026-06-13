@@ -1,8 +1,12 @@
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DB_PATH = Path("leads.db")
+# Configurable so a deployment can point at a file on a mounted persistent
+# volume (default container storage is ephemeral and wipes on restart).
+# Defaults to a local file for development.
+DB_PATH = Path(os.getenv("LEADS_DB_PATH", "leads.db"))
 
 # The pipeline stages a user can move a lead through.
 # Order matters — used for the filter dropdown.
