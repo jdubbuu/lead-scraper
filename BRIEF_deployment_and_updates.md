@@ -149,3 +149,50 @@ Demonstrate each by actually doing it:
   change in `database.py`).
 - Multi-tenant features — the model is one isolated instance per client.
 - Any change that bakes secrets into the image or commits them to the repo.
+
+---
+
+## Implementation outcome — completed 2026-06-13
+
+**Status: delivered and live.** All eight acceptance criteria verified (1–5 and 7
+locally with Docker; 3 and 6 against the live host). Live staging/canary instance:
+`https://lead-scraper-sxih.onrender.com` (Render service `srv-d8me4bsm0tmc73d1j22g`).
+
+### Prerequisite that had to be built first
+The brief assumed an existing `auth.py`/`config.py` login gate — **it did not exist
+in the repo.** The login gate was built before any deployment work: `config.py`
+(top-level config from env; `[auth.users.*]` from the secrets file; refuses to start
+without `COOKIE_KEY`), `auth.py` (`require_login()` halts the script for
+unauthenticated visitors; sidebar logout; `streamlit-authenticator`, `auto_hash=False`),
+and `gen_password_hash.py`. `app.py` calls the gate immediately after
+`set_page_config`. The "do not touch `auth.py`/`config.py`" line above therefore
+refers to *not further modifying* this newly-built layer.
+
+### Delivered files
+`Dockerfile`, `entrypoint.sh`, `.dockerignore`, `deploy/rollout.sh`,
+`deploy/backup.sh`, `deploy/instances/example.env`, `RUNBOOK.md`, plus the auth
+layer above. `database.py` D4 change made (`LEADS_DB_PATH`). `.gitattributes` added
+to force LF on shell scripts (a CRLF `entrypoint.sh` would break in the container).
+
+### Decisions / deviations worth recording
+- **Host: Render** (Docker web service + persistent disk at `/var/data` + automatic
+  HTTPS), per the brief's recommended-default PaaS.
+- **Non-root + persistent disk (D1):** a freshly-mounted disk is root-owned, so a
+  non-root app can't write `leads.db`. The entrypoint starts as root only to
+  materialize secrets and `chown` the data dir, then drops to `appuser` via `gosu`.
+  The app still runs non-root.
+- **Secrets delivery (D3):** the portable `SECRETS_TOML_B64` entrypoint path is
+  shipped, **and** the entrypoint also accepts a host-native raw secret file at
+  `/etc/secrets/secrets.toml` (Render "Secret Files"). Staging uses the secret-file
+  path — pasting the base64 blob into Render's env field repeatedly corrupted it.
+  The b64 decode also strips paste whitespace for robustness.
+- **Staged rollout (D5):** `deploy/rollout.sh` is a Render reference with one
+  swappable deploy function. Proven live: `deploy v1.0.0` → health-checked; `deploy
+  v1.0.1` → `rollback` restored `v1.0.0`, each gated on `/_stcore/health`. Client
+  instances must have **Render auto-deploy OFF** so updates come only through the
+  staged rollout (added to the RUNBOOK onboarding checklist).
+
+### Open follow-up
+- Rotate the `GOOGLE_PLACES_API_KEY`, `ANTHROPIC_API_KEY` (exposed in setup
+  screenshots) and the Render API key (pasted during rollout), then update the
+  Render Secret File.
